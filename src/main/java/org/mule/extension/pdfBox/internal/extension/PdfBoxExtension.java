@@ -1,3 +1,9 @@
+/*
+ * Copyright 2025 Salesforce, Inc. All rights reserved.
+ * The software in this package is published under the terms of the CPAL v1.0
+ * license, a copy of which has been included with this distribution in the
+ * LICENSE.txt file.
+ */
 package org.mule.extension.pdfBox.internal.extension;
 
 import org.mule.extension.pdfBox.internal.config.PdfBoxConfiguration;
@@ -37,8 +43,8 @@ import org.mule.sdk.api.meta.JavaVersion;
 )
 @Xml(prefix = "pdfbox")                                // XML prefix used in Mule config files
 @Configurations(PdfBoxConfiguration.class)             // Configuration class
-@JavaVersionSupport({ JavaVersion.JAVA_17 })           // Java version support
-@MinMuleVersion("4.9.0")                               // Minimum Mule runtime version required
+@JavaVersionSupport({ JavaVersion.JAVA_8, JavaVersion.JAVA_11, JavaVersion.JAVA_17 })           // Java version support
+@MinMuleVersion("4.6.0")                               // Minimum Mule runtime version required
 @Operations(PdfBoxOperations.class)                    // Class containing operations
 @ErrorTypes(PdfBoxErrors.class)                        // Declares reusable error types
 public class PdfBoxExtension {

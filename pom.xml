@@ -1,80 +1,225 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 
-  <parent>
-    <groupId>org.mule.extensions</groupId>
-    <artifactId>mule-modules-parent</artifactId>
-    <version>1.9.3</version>
-  </parent>
+	<parent>
+		<groupId>org.mule.extensions</groupId>
+		<artifactId>mule-modules-parent</artifactId>
+		<version>1.6.13</version>
+	</parent>
 
-  <modelVersion>4.0.0</modelVersion>
-  <groupId>io.github.mulesoft-forge</groupId>
-  <artifactId>mule-pdfbox-module</artifactId>
-  <packaging>mule-extension</packaging>
-  <version>0.0.9</version>
-  <name>MuleSoftForge PDFBox</name>
-  <description>A Mule extension to Manipulate PDF using Apache PDFBox</description>
-  <url>https://github.com/MuleSoft-Forge/mule-pdfbox-module</url>
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>io.github.mulesoft-forge</groupId>
+	<artifactId>mule-pdfbox-module</artifactId>
+	<packaging>mule-extension</packaging>
+	<version>0.0.10</version>
 
-  <organization>
-    <name>MuleSoft-Forge</name>
-    <url>https://mulesoftforge.com/</url>
-  </organization>
+	<name>MuleSoftForge PDFBox Module</name>
+	<description>A Mule extension that provides functionality to Manipulate a PDF using Apache PDFBox</description>
+	<url>https://github.com/MuleSoft-Forge/mule-pdfbox-module</url>
 
-  <licenses>
-    <license>
-      <name>CPAL v1.0</name>
-      <url>http://www.mulesoft.com/CPAL</url>
-    </license>
-  </licenses>
+	<organization>
+		<name>MuleSoft-Forge</name>
+		<url>https://mulesoftforge.com/</url>
+	</organization>
 
-  <developers>
-    <developer>
-      <name>George Jeffcock</name>
-      <email>gjeffcock@mulesoft.com</email>
-      <organization>Salesforce</organization>
-      <organizationUrl>https://www.mulesoft.com</organizationUrl>
-    </developer>
-  </developers>
+	<licenses>
+		<license>
+			<name>CPAL v1.0</name>
+			<url>http://www.mulesoft.com/CPAL</url>
+		</license>
+	</licenses>
 
-  <scm>
-    <connection>scm:git:git://github.com/MuleSoft-Forge/mule-pdfbox-module.git</connection>
-    <developerConnection>scm:git:ssh://github.com:MuleSoft-Forge/mule-pdfbox-module.git</developerConnection>
-    <url>https://github.com/MuleSoft-Forge/mule-pdfbox-module.git</url>
-  </scm>
+	<developers>
+		<developer>
+			<name>George Jeffcock</name>
+			<email>gjeffcock@mulesoft.com</email>
+			<organization>Salesforce</organization>
+			<organizationUrl>https://www.mulesoft.com</organizationUrl>
+		</developer>
+		<developer>
+			<name>Reza Lexén</name>
+			<email>reza.lexen@redpill-linpro.com</email>
+			<organization>Redpill Linpro</organization>
+			<organizationUrl>https://www.linkedin.com/in/reznas</organizationUrl>
+		</developer>
+	</developers>
 
+	<scm>
+		<connection>scm:git:git://github.com/MuleSoft-Forge/mule-pdfbox-module.git</connection>
+		<developerConnection>scm:git:ssh://github.com:MuleSoft-Forge/mule-pdfbox-module.git</developerConnection>
+		<url>https://github.com/MuleSoft-Forge/mule-pdfbox-module.git</url>
+	</scm>
 
-  <properties>
-    <munit.version>3.0.0</munit.version>
-  </properties>
+	<properties>
+		<maven.javadoc.skip>false</maven.javadoc.skip>
+		<formatter.config.path>formatter.xml</formatter.config.path>
 
+		<mulesoft.license.version>1.4.0</mulesoft.license.version>
+		<license.maven.plugin.version>2.11</license.maven.plugin.version>
+		<license.path>LICENSE_HEADER_CPAL.txt</license.path>
+		<license.year>2025</license.year>
 
+		<rest.sdk.commons.version>0.11.0</rest.sdk.commons.version>
+		<muleJavaEeBomVersion>4.6.11</muleJavaEeBomVersion>
+	</properties>
 
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.pdfbox</groupId>
-      <artifactId>pdfbox</artifactId>
-      <version>3.0.4</version>
-    </dependency>
-  </dependencies>
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>com.mycila</groupId>
+				<artifactId>license-maven-plugin</artifactId>
+				<version>${license.maven.plugin.version}</version>
+				<dependencies>
+					<dependency>
+						<groupId>com.mulesoft.license</groupId>
+						<artifactId>license</artifactId>
+						<version>${mulesoft.license.version}</version>
+					</dependency>
+				</dependencies>
+				<configuration>
+					<header>${license.path}</header>
+					<properties>
+						<year>${license.year}</year>
+					</properties>
+					<includes>
+						<include>**/*.java</include>
+					</includes>
+					<mapping>
+						<java>SLASHSTAR_STYLE</java>
+					</mapping>
+				</configuration>
+				<executions>
+					<execution>
+						<phase>compile</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>3.11.2</version>
+				<executions>
+					<execution>
+						<id>attach-javadocs</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-source-plugin</artifactId>
+				<version>3.3.1</version>
+				<executions>
+					<execution>
+						<id>attach-sources</id>
+						<phase>package</phase>
+						<goals>
+							<goal>jar</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>net.nicoulaj.maven.plugins</groupId>
+				<artifactId>checksum-maven-plugin</artifactId>
+				<version>1.11</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>files</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<fileSets>
+						<fileSet>
+							<directory>${project.build.directory}</directory>
+							<includes>*.jar</includes>
+						</fileSet>
+					</fileSets>
+					<algorithms>
+						<algorithm>MD5</algorithm>
+						<algorithm>SHA-1</algorithm>
+						<algorithm>SHA-256</algorithm>
+					</algorithms>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-gpg-plugin</artifactId>
+				<version>3.2.7</version>
+			</plugin>
+			<plugin>
+				<groupId>org.sonatype.central</groupId>
+				<artifactId>central-publishing-maven-plugin</artifactId>
+				<version>0.7.0</version>
+				<extensions>true</extensions>
+				<configuration>
+					<publishingServerId>maven-central-mulesoft-forge</publishingServerId>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
 
-  <repositories>
-    <repository>
-      <id>mule-releases</id>
-      <name>Nexus Public Releases</name>
-      <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases/</url>
-    </repository>
-  </repositories>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.mule</groupId>
+				<artifactId>mule-javaee-runtime-bom</artifactId>
+				<version>${muleJavaEeBomVersion}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 
-  <pluginRepositories>
-    <pluginRepository>
-      <id>mulesoft-releases</id>
-      <name>mulesoft release repository</name>
-      <layout>default</layout>
-      <url>https://repository.mulesoft.org/releases/</url>
-      <snapshots>
-        <enabled>false</enabled>
-      </snapshots>
-    </pluginRepository>
-  </pluginRepositories>
+	<dependencies>
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>3.0.4</version>
+		</dependency>
+	</dependencies>
+
+	<repositories>
+		<repository>
+			<id>anypoint-exchange-v3</id>
+			<name>Anypoint Exchange</name>
+			<url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+			<layout>default</layout>
+		</repository>
+		<repository>
+			<id>mulesoft-releases</id>
+			<name>MuleSoft Releases Repository</name>
+			<url>https://repository.mulesoft.org/releases/</url>
+			<layout>default</layout>
+		</repository>
+		<repository>
+			<id>mulesoft-public</id>
+			<name>MuleSoft Public Repository</name>
+			<url>https://repository.mulesoft.org/nexus/content/repositories/public/</url>
+			<layout>default</layout>
+		</repository>
+	</repositories>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>mulesoft-releases</id>
+			<name>MuleSoft Releases Repository</name>
+			<layout>default</layout>
+			<url>https://repository.mulesoft.org/releases/</url>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
+
 </project>

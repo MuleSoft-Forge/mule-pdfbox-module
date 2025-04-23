@@ -1,3 +1,9 @@
+/*
+ * Copyright 2025 Salesforce, Inc. All rights reserved.
+ * The software in this package is published under the terms of the CPAL v1.0
+ * license, a copy of which has been included with this distribution in the
+ * LICENSE.txt file.
+ */
 package org.mule.extension.pdfBox.internal.operation;
 
 import org.apache.pdfbox.Loader;
@@ -44,7 +50,7 @@ import static org.slf4j.LoggerFactory.getLogger;
 /**
  * Contains all operations exposed by the Apache PDFBox MuleSoft connector.
  * Operations include reading metadata, extracting text, filtering pages,
- * compressing and rotating PDF documents.
+ * rotating PDF documents.
  */
 public class PdfBoxOperations {
 
@@ -65,9 +71,10 @@ public class PdfBoxOperations {
             @NotNull @DisplayName("PDF File [Binary]")
             @Content @TypeResolver(PdfBoxBinaryMetadataResolver.class)
             InputStream pdfFile,
-            StreamingHelper streamingHelper) {
+            StreamingHelper streamingHelper) throws IOException {
 
-        byte[] pdfBytes = readAllBytes(pdfFile);
+//        byte[] pdfBytes = readAllBytes(pdfFile);
+        byte[] pdfBytes = toByteArray(pdfFile);
 
         long pdfSize = pdfBytes.length;
 
@@ -101,10 +108,10 @@ public class PdfBoxOperations {
             @Example("1,2,4,6-12")
             @Optional String pageRange,
 
-            StreamingHelper streamingHelper) {
+            StreamingHelper streamingHelper) throws IOException {
 
-        byte[] pdfBytes = readAllBytes(pdfFile);
-
+        //byte[] pdfBytes = readAllBytes(pdfFile);
+        byte[] pdfBytes = toByteArray(pdfFile);
         long pdfSize = pdfBytes.length;
 
         try (PDDocument pdfDoc = Loader.loadPDF(pdfBytes)) {
@@ -120,7 +127,7 @@ public class PdfBoxOperations {
                 try {
                     combinedText.append(stripper.getText(pdfDoc)).append("\n");
                 } catch (IOException e) {
-                    throw new ModuleException("Error extracting text from page " + page, PdfBoxErrors.TEXT_EXTRACTION_FAILED, e);
+                    throw new ModuleException("Error extracting text from page " + page, PdfBoxErrors.PDF_TEXT_EXTRACTION_FAILED, e);
                 }
             }
 
@@ -149,9 +156,10 @@ public class PdfBoxOperations {
 
             @ParameterGroup(name = "Filter Options [Only one choice allowed]") PdfBoxPdfOptions options,
 
-            StreamingHelper streamingHelper) {
+            StreamingHelper streamingHelper) throws IOException {
 
-        byte[] pdfBytes = readAllBytes(pdfFile);
+        // byte[] pdfBytes = readAllBytes(pdfFile);
+        byte[] pdfBytes = toByteArray(pdfFile);
 
         try (PDDocument original = Loader.loadPDF(pdfBytes);
              PDDocument filtered = new PDDocument()) {
@@ -167,7 +175,7 @@ public class PdfBoxOperations {
                     continue;
                 }
 
-                var page = original.getPage(i);
+                PDPage page = original.getPage(i);
                 if (removeBlanks && isPageBlank(original, page)) {
                     continue;
                 }
@@ -186,7 +194,7 @@ public class PdfBoxOperations {
                     .attributes(attributes)
                     .build();
         } catch (IOException e) {
-            throw new ModuleException("Failed to process PDF: " + e.getMessage(), PdfBoxErrors.PROCESSING_ERROR, e);
+            throw new ModuleException("Failed to process PDF: " + e.getMessage(), PdfBoxErrors.PDF_PROCESSING_ERROR, e);
         }
     }
 
@@ -208,9 +216,10 @@ public class PdfBoxOperations {
             @Summary("The rotation angle in degrees (e.g., 90, 180, 270).")
             @Optional(defaultValue = "90") int rotationAngle,
 
-            StreamingHelper streamingHelper) {
+            StreamingHelper streamingHelper) throws IOException {
 
-        byte[] pdfBytes = readAllBytes(pdfFile);
+        //byte[] pdfBytes = readAllBytes(pdfFile);
+        byte[] pdfBytes = toByteArray(pdfFile);
 
         long pdfSize = pdfBytes.length;
         try (PDDocument pdfDoc = Loader.loadPDF(pdfBytes)) {
@@ -245,14 +254,27 @@ public class PdfBoxOperations {
         }
     }
 
-    private byte[] readAllBytes(InputStream input) {
-        Objects.requireNonNull(input, "Input stream cannot be null");
-        try {
-            return input.readAllBytes();
-        } catch (IOException e) {
-            throw new ModuleException("Failed to read input PDF stream.", PdfBoxErrors.IO_ERROR, e);
+    /**
+     * Utility method to read all bytes from an InputStream (Java 8 compatible).
+     */
+    private static byte[] toByteArray(InputStream input) throws IOException {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        int nRead;
+        byte[] data = new byte[4096];
+        while ((nRead = input.read(data, 0, data.length)) != -1) {
+            buffer.write(data, 0, nRead);
         }
+        return buffer.toByteArray();
     }
+
+//    private byte[] readAllBytes(InputStream input) {
+//        Objects.requireNonNull(input, "Input stream cannot be null");
+//        try {
+//            return input.readAllBytes();
+//        } catch (IOException e) {
+//            throw new ModuleException("Failed to read input PDF stream.", PdfBoxErrors.PDF_IO_ERROR, e);
+//        }
+//    }
 
     private Set<Integer> parsePageRange(String pageRange, int totalPages) {
         Set<Integer> pages = new TreeSet<>();
@@ -274,7 +296,7 @@ public class PdfBoxOperations {
             if (!matcher.matches()) {
                 throw new ModuleException(
                         "Invalid page range segment: \"" + segment + "\". Expected format like 2,4,9-12.",
-                        PdfBoxErrors.INVALID_PAGE_RANGE
+                        PdfBoxErrors.PDF_INVALID_PAGE_RANGE
                 );
             }
 
@@ -284,7 +306,7 @@ public class PdfBoxOperations {
             if (start > end) {
                 throw new ModuleException(
                         "Invalid page range: \"" + segment + "\". Start page must not be greater than end page.",
-                        PdfBoxErrors.INVALID_PAGE_RANGE
+                        PdfBoxErrors.PDF_INVALID_PAGE_RANGE
                 );
             }
 
@@ -328,7 +350,7 @@ public class PdfBoxOperations {
     private PdfBoxFileAttributes extractPdfMetadata(PDDocument pdfDoc, long pdfSize) {
         PDDocumentInformation info = pdfDoc.getDocumentInformation();
         if (info == null) {
-            throw new ModuleException("Unable to extract PDF metadata.", PdfBoxErrors.METADATA_EXTRACTION_FAILED);
+            throw new ModuleException("Unable to extract PDF metadata.", PdfBoxErrors.PDF_METADATA_EXTRACTION_FAILED);
         }
 
         PdfBoxFileAttributes attributes = new PdfBoxFileAttributes();
