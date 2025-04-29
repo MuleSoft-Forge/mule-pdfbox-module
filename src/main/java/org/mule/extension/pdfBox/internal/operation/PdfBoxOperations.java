@@ -18,8 +18,11 @@ import org.mule.extension.pdfBox.api.PdfBoxFileAttributes;
 import org.mule.extension.pdfBox.internal.error.PdfBoxErrorTypeProvider;
 import org.mule.extension.pdfBox.internal.error.PdfBoxErrors;
 import org.mule.extension.pdfBox.internal.metadata.PdfBoxBinaryMetadataResolver;
+import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPageRotation;
 import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPdfOptions;
 import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxRemoveBlankOption;
+import org.mule.runtime.api.meta.ExpressionSupport;
+import org.mule.runtime.extension.api.annotation.Expression;
 import org.mule.runtime.extension.api.annotation.error.Throws;
 import org.mule.runtime.extension.api.annotation.metadata.TypeResolver;
 import org.mule.runtime.extension.api.annotation.param.Content;
@@ -39,12 +42,13 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.text.SimpleDateFormat;
-import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPageRotation.ROTATION_90;
+import static org.mule.runtime.api.meta.ExpressionSupport.NOT_SUPPORTED;
 import static org.slf4j.LoggerFactory.getLogger;
 
 /**
@@ -94,6 +98,14 @@ public class PdfBoxOperations {
         }
     }
 
+    /**
+     * Extracts text content from selected pages in a PDF based on a user-defined page range.
+     *
+     * @param pdfFile         Binary content of the PDF
+     * @param pageRange       Comma-separated list of individual pages and ranges (e.g., 1,2,5-7)
+     * @param streamingHelper MuleSoft streaming helper
+     * @return Extracted text and metadata as attributes
+     */
     @MediaType(value = MediaType.TEXT_PLAIN)
     @DisplayName("Apache PDFBox - Extract Text")
     @Summary("Extracts text from specific pages/ranges in a PDF, e.g., 2,4,9-11.")
@@ -145,6 +157,14 @@ public class PdfBoxOperations {
         }
     }
 
+    /**
+     * Filters a PDF to remove blank pages or include only selected ranges.
+     *
+     * @param pdfFile         Binary content of the PDF
+     * @param options         Parameter group for filtering pages (blank removal or range)
+     * @param streamingHelper MuleSoft streaming helper
+     * @return New PDF stream with filtered pages and metadata as attributes
+     */
     @MediaType(value = MediaType.APPLICATION_OCTET_STREAM)
     @Throws(PdfBoxErrorTypeProvider.class)
     @DisplayName("Apache PDFBox - Filter Pages")
@@ -198,6 +218,15 @@ public class PdfBoxOperations {
         }
     }
 
+    /**
+     * Rotates specific pages in a PDF to a defined angle.
+     *
+     * @param pdfFile         Binary content of the PDF
+     * @param pageRange       Comma-separated page list/ranges to rotate
+     * @param rotationAngle   Degrees to rotate (e.g., 90, 180, 270)
+     * @param streamingHelper MuleSoft streaming helper
+     * @return Rotated PDF with updated metadata
+     */
     @MediaType(value = MediaType.APPLICATION_OCTET_STREAM)
     @DisplayName("Apache PDFBox - Rotate Pages")
     @Summary("Rotates specific pages in a PDF document based on the provided page range and rotation angle.")
@@ -213,8 +242,10 @@ public class PdfBoxOperations {
             @Optional String pageRange,
 
             @DisplayName("Rotation Angle")
+            @Expression(NOT_SUPPORTED)
             @Summary("The rotation angle in degrees (e.g., 90, 180, 270).")
-            @Optional(defaultValue = "90") int rotationAngle,
+            PdfBoxPageRotation rotationAngle,
+
 
             StreamingHelper streamingHelper) throws IOException {
 
@@ -230,7 +261,7 @@ public class PdfBoxOperations {
             for (Integer pageNumber : pageSet) {
                 if (pageNumber >= 1 && pageNumber <= totalPages) {
                     PDPage page = pdfDoc.getPage(pageNumber - 1); // Page numbers are 1-based, so adjust
-                    page.setRotation(rotationAngle);
+                    page.setRotation(rotationAngle.getValue());
                 }
             }
 
@@ -254,8 +285,13 @@ public class PdfBoxOperations {
         }
     }
 
+
     /**
-     * Utility method to read all bytes from an InputStream (Java 8 compatible).
+     * Reads all bytes from the given InputStream into a byte array.
+     *
+     * @param input the InputStream to read
+     * @return a byte array containing the input stream's data
+     * @throws IOException if an I/O error occurs while reading
      */
     private static byte[] toByteArray(InputStream input) throws IOException {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -276,6 +312,14 @@ public class PdfBoxOperations {
 //        }
 //    }
 
+    /**
+     * Parses a string representing individual pages and page ranges (e.g., "1,3-5,7") into a set of page numbers.
+     *
+     * @param pageRange   a comma-separated list of pages and ranges
+     * @param totalPages  the total number of pages in the document for bounds checking
+     * @return a Set of integers representing all selected page numbers
+     * @throws ModuleException if the range format is invalid or out of bounds
+     */
     private Set<Integer> parsePageRange(String pageRange, int totalPages) {
         Set<Integer> pages = new TreeSet<>();
 
@@ -320,33 +364,75 @@ public class PdfBoxOperations {
         return pages;
     }
 
+    /**
+     * Checks whether a given page in the PDF is blank (i.e., no visible text or image XObjects).
+     *
+     * @param doc  the parent PDDocument for context
+     * @param page the page to analyze
+     * @return true if the page has no text or images; false otherwise
+     * @throws IOException if PDFBox fails to access or interpret the page
+     */
     private boolean isPageBlank(PDDocument doc, PDPage page) throws IOException {
         int pageIndex = doc.getPages().indexOf(page) + 1;
 
-        // 1. Check for visible text
+        // 1. Check for visible text on the specific page
         PDFTextStripper stripper = new PDFTextStripper();
+        stripper.setStartPage(pageIndex);
+        stripper.setEndPage(pageIndex);
         String text = stripper.getText(doc);
 
-        // 2. Check for annotations or images
+        if (!text.trim().isEmpty()) {
+            return false; // Contains visible text
+        }
+
+        // 2. Check for image/graphic XObjects
         PDResources resources = page.getResources();
         if (resources != null) {
-            Iterable<COSName> xObjectNames = resources.getXObjectNames();
-            int count = 0;
-
-            // Iterate over the Iterable to count XObjects
-            for (COSName cosName : xObjectNames) {
-                count++;
-            }
-
-            // If there are any XObjects (images, graphics), the page is not blank
-            if (count > 0) {
-                return false; // The page is not blank because it contains XObjects
+            try {
+                Iterable<COSName> xObjectNames = resources.getXObjectNames();
+                if (xObjectNames != null) {
+                    for (COSName cosName : xObjectNames) {
+                        return false; // At least one XObject found
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Error accessing XObject names on page {}: {}", pageIndex, e.getMessage());
             }
         }
 
-        return text.trim().isEmpty(); // Return true if text is empty
+        // 3. Check for annotations on the page
+        if (page.getAnnotations() != null && !page.getAnnotations().isEmpty()) {
+            return false;
+        }
+
+        // 4. Check for interactive form fields on the page
+        if (doc.getDocumentCatalog().getAcroForm() != null &&
+                doc.getDocumentCatalog().getAcroForm().getFields() != null &&
+                !doc.getDocumentCatalog().getAcroForm().getFields().isEmpty()) {
+
+            for (org.apache.pdfbox.pdmodel.interactive.form.PDField field : doc.getDocumentCatalog().getAcroForm().getFields()) {
+                if (field.getWidgets() != null) {
+                    for (org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationWidget widget : field.getWidgets()) {
+                        if (widget.getPage() != null && widget.getPage().equals(page)) {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+
+        return true; // Page has no text, no images, no annotations, and no form fields
     }
 
+
+    /**
+     * Extracts standard metadata fields (title, author, dates, keywords) from a PDF document.
+     *
+     * @param pdfDoc  the loaded PDDocument
+     * @param pdfSize the size in bytes of the original PDF stream
+     * @return a populated PdfBoxFileAttributes instance
+     * @throws ModuleException if metadata cannot be retrieved
+     */
     private PdfBoxFileAttributes extractPdfMetadata(PDDocument pdfDoc, long pdfSize) {
         PDDocumentInformation info = pdfDoc.getDocumentInformation();
         if (info == null) {
