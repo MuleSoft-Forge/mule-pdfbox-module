@@ -6,8 +6,10 @@
  */
 package org.mule.extension.pdfBox.internal.operation;
 
+
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.multipdf.Splitter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -21,7 +23,6 @@ import org.mule.extension.pdfBox.internal.metadata.PdfBoxBinaryMetadataResolver;
 import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPageRotation;
 import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPdfOptions;
 import org.mule.extension.pdfBox.internal.operation.parts.PdfBoxRemoveBlankOption;
-import org.mule.runtime.api.meta.ExpressionSupport;
 import org.mule.runtime.extension.api.annotation.Expression;
 import org.mule.runtime.extension.api.annotation.error.Throws;
 import org.mule.runtime.extension.api.annotation.metadata.TypeResolver;
@@ -37,17 +38,15 @@ import org.mule.runtime.extension.api.runtime.operation.Result;
 import org.mule.runtime.extension.api.runtime.streaming.StreamingHelper;
 import org.slf4j.Logger;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.mule.extension.pdfBox.internal.operation.parts.PdfBoxPageRotation.ROTATION_90;
 import static org.mule.runtime.api.meta.ExpressionSupport.NOT_SUPPORTED;
 import static org.slf4j.LoggerFactory.getLogger;
 
@@ -456,6 +455,121 @@ public class PdfBoxOperations {
         }
 
         return attributes;
+    }
+
+
+
+    /**
+     * Splits a PDF document into multiple documents based on a page increment.
+     * Compatible with Java 1.8.
+     *
+     * @param pdfFile         Binary content of the PDF.
+     * @param pageIncrement   Number of pages per split document. Defaults to 1.
+     * @param streamingHelper MuleSoft streaming helper (currently unused but good practice to include).
+     * @return A List of InputStreams, each representing a split PDF document.
+     * Attributes of the original PDF are returned.
+     * @throws IOException If there's an error reading/processing the PDF.
+     * @throws ModuleException If splitting fails or the increment is invalid.
+     */
+    @DisplayName("Apache PDFBox - Split Pages")
+    @Summary("Splits the PDF into multiple documents, each containing the specified number of pages.")
+    // Note: Returning List<InputStream> holds all split documents in memory.
+    // Consider returning PagingProvider for better memory management with large files.
+    @Throws(PdfBoxErrorTypeProvider.class)
+    public Result<List<InputStream>, PdfBoxFileAttributes> splitPdfByIncrement(
+            @NotNull @DisplayName("PDF File [Binary]")
+            @Content @TypeResolver(PdfBoxBinaryMetadataResolver.class)
+            InputStream pdfFile,
+
+            @DisplayName("Page Increment")
+            @Summary("Number of pages for each split document.")
+            @Optional(defaultValue="1") // Default to splitting into single pages
+            Integer pageIncrement,
+
+            StreamingHelper streamingHelper) throws IOException {
+
+        if (pageIncrement == null || pageIncrement <= 0) {
+            throw new ModuleException("Page increment must be a positive integer.", PdfBoxErrors.PDF_PROCESSING_ERROR); // Or a more specific error
+        }
+
+        // Using the toByteArray method provided in the original class
+        byte[] pdfBytes = toByteArray(pdfFile);
+        long originalPdfSize = pdfBytes.length;
+        List<InputStream> splitDocuments = new ArrayList<>();
+        PdfBoxFileAttributes originalAttributes = null;
+
+        PDDocument document = null; // Declare outside try-finally for closing scope
+        try {
+            document = Loader.loadPDF(pdfBytes);
+            originalAttributes = extractPdfMetadata(document, originalPdfSize); // Get metadata before splitting
+            int totalPages = document.getNumberOfPages();
+
+            if (totalPages == 0) {
+                LOGGER.warn("Input PDF has 0 pages. Returning empty list of split documents.");
+                // Return empty list and original attributes (which will show 0 pages)
+                return Result.<List<InputStream>, PdfBoxFileAttributes>builder()
+                        .output(splitDocuments)
+                        .attributes(originalAttributes)
+                        .build();
+            }
+
+            Splitter splitter = new Splitter();
+            // splitter.setStartPage(?); // Can set start if needed
+            // splitter.setEndPage(?); // Can set end if needed
+            splitter.setSplitAtPage(pageIncrement); // Set the increment
+
+            List<PDDocument> splitPDDocs = splitter.split(document);
+            List<Closeable> resourcesToClose = new ArrayList<>(); // Keep track of resources
+
+            try {
+                for (PDDocument splitDoc : splitPDDocs) {
+                    resourcesToClose.add(splitDoc); // Add doc to be closed later
+                    ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                    resourcesToClose.add(baos); // Add stream to be closed later
+                    splitDoc.save(baos);
+                    splitDocuments.add(new ByteArrayInputStream(baos.toByteArray()));
+                    // Note: We don't close baos here; its content is needed for the ByteArrayInputStream.
+                    // ByteArrayOutputStream close() is effectively a no-op anyway.
+                    // We mainly need to ensure splitDoc is closed.
+                }
+            } catch (IOException e) {
+                // If saving fails, still need to close resources created so far
+                throw new ModuleException("Failed to save a split PDF document part.", PdfBoxErrors.PDF_PROCESSING_ERROR, e);
+            } finally {
+                // Close all split PDDocuments *after* processing
+                for (Closeable resource : resourcesToClose) {
+                    // Only close PDDocuments here, BAOS close is no-op
+                    if (resource instanceof PDDocument) {
+                        try {
+                            resource.close();
+                        } catch (IOException ce) {
+                            LOGGER.error("Failed to close split PDDocument resource.", ce);
+                            // Log and continue closing others
+                        }
+                    }
+                }
+            }
+
+            LOGGER.info("Successfully split PDF into {} documents with increment {}", splitDocuments.size(), pageIncrement);
+
+            return Result.<List<InputStream>, PdfBoxFileAttributes>builder()
+                    .output(splitDocuments)
+                    .attributes(originalAttributes)
+                    .build();
+
+        } catch (IOException e) {
+            throw new ModuleException("Failed to load or split PDF document.", PdfBoxErrors.PDF_LOAD_FAILED, e); // Re-use or add PDF_SPLIT_FAILED
+        } finally {
+            // Ensure the main PDDocument is closed
+            if (document != null) {
+                try {
+                    document.close();
+                } catch (IOException e) {
+                    LOGGER.error("Failed to close original PDF document.", e);
+                    // Log error, but can't do much more here as an exception might already be propagating
+                }
+            }
+        }
     }
 
 }
