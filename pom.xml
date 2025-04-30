@@ -13,7 +13,7 @@
 	<groupId>io.github.mulesoft-forge</groupId>
 	<artifactId>mule-pdfbox-module</artifactId>
 	<packaging>mule-extension</packaging>
-	<version>0.0.13</version>
+	<version>1.0.0</version>
 
 	<name>MuleSoftForge PDFBox Module</name>
 	<description>A Mule extension that provides functionality to Manipulate a PDF using Apache PDFBox</description>
@@ -156,6 +156,25 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-gpg-plugin</artifactId>
 				<version>3.2.7</version>
+				<executions>
+					<execution>
+						<id>sign-artifacts</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>sign</goal>
+						</goals>
+						<configuration>
+							<useAgent>true</useAgent>
+							<keyname>${env.MAVEN_GPG_KEYNAME}</keyname>
+							<passphrase>${env.MAVEN_GPG_PASSPHRASE}</passphrase>
+							<gpgArguments>
+								<arg>--batch</arg>
+								<arg>--pinentry-mode</arg>
+								<arg>loopback</arg>
+							</gpgArguments>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.sonatype.central</groupId>
