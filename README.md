@@ -11,6 +11,7 @@ A lightweight MuleSoft connector that enables PDF manipulation using Apache PDFB
 - **Filter Pages**: Remove blank pages and/or keep only selected page ranges.
 - **Rotate Pages**: Rotate a range of pages clockwise or counterclockwise.
 - **Split Pages**: Split a PDF into individual single-page PDF files.
+- **Merge PDFs**: Merge array of PDFs into individual single PDF file.
 
 ## 🧰 Built With
 
@@ -70,6 +71,13 @@ A lightweight MuleSoft connector that enables PDF manipulation using Apache PDFB
 **Description**: Splits a multi-page PDF into a list of single-page PDF files.  
 **Input**: PDF `InputStream`  
 **Output**: List of `InputStream`s, one per page
+
+---
+
+### `mergePDFs`
+**Description**: Merge array of PDFs into individual single PDF file.  
+**Input**: PDF Array of `InputStream`s, one per PDF
+**Output**: PDF `InputStream`
 
 ---
 
