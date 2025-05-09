@@ -9,6 +9,9 @@ package org.mule.extension.pdfBox.internal.operation;
 
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.io.RandomAccessRead;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.multipdf.Splitter;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
@@ -40,10 +43,7 @@ import org.slf4j.Logger;
 
 import java.io.*;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -571,5 +571,82 @@ public class PdfBoxOperations {
             }
         }
     }
+
+
+    /**
+     * Merges multiple PDF documents into a single PDF document.
+     * <p>
+     * This operation requires at least two PDF files. It is Java 8 compatible and works with PDFBox 3.0.4.
+     * Each input PDF is converted to a {@link org.apache.pdfbox.io.RandomAccessReadBuffer} to comply
+     * with PDFBox's input requirements.
+     * <p>
+     * The resulting merged PDF retains the content of all input documents and returns metadata
+     * including total number of pages, size, and optional document properties like title or author.
+     * Temporary in-memory buffers are closed after the operation completes.
+     *
+     * @param pdfFiles          An array of PDF InputStreams to merge. Must contain at least two PDFs.
+     * @param streamingHelper   MuleSoft streaming helper (not used directly but required by signature).
+     * @return A Result containing the merged PDF as an InputStream and extracted {@link PdfBoxFileAttributes}.
+     * @throws IOException      If reading or writing the PDFs fails.
+     * @throws ModuleException  If fewer than two PDFs are provided, or if the merge fails.
+     */
+    @DisplayName("Apache PDFBox - Merge PDFs")
+    @Summary("Merges multiple PDF files into a single PDF document.")
+    @MediaType(value = MediaType.APPLICATION_OCTET_STREAM)
+    @Throws(PdfBoxErrorTypeProvider.class)
+    public Result<InputStream, PdfBoxFileAttributes> mergePdfs(
+            @Expression
+            @Content
+            @NotNull
+            @DisplayName("PDF Files [List of Binary]") List<InputStream> pdfFiles,
+            @Summary("An array of PDF files to merge. Must contain at least two PDFs.")
+            StreamingHelper streamingHelper) throws IOException {
+
+        if (pdfFiles.size() < 2) {
+            throw new ModuleException("At least two PDF files are required for merging.", PdfBoxErrors.PDF_PROCESSING_ERROR);
+        }
+
+        ByteArrayOutputStream mergedOutputStream = new ByteArrayOutputStream();
+        PDFMergerUtility merger = new PDFMergerUtility();
+        merger.setDestinationStream(mergedOutputStream);
+
+        List<RandomAccessRead> buffers = new ArrayList<>();
+        try {
+            for (InputStream pdfStream : pdfFiles) {
+                byte[] bytes = toByteArray(pdfStream);
+                RandomAccessRead rar = new RandomAccessReadBuffer(bytes);
+                buffers.add(rar);
+                merger.addSource(rar);
+            }
+
+            merger.mergeDocuments(null);
+
+            byte[] mergedBytes = mergedOutputStream.toByteArray();
+
+            // ? Extract metadata from the new merged document
+            try (PDDocument mergedDoc = Loader.loadPDF(mergedBytes)) {
+                PdfBoxFileAttributes attributes = extractPdfMetadata(mergedDoc, mergedBytes.length);
+
+                return Result.<InputStream, PdfBoxFileAttributes>builder()
+                        .output(new ByteArrayInputStream(mergedBytes))
+                        .attributes(attributes)
+                        .mediaType(org.mule.runtime.api.metadata.MediaType.parse("application/octet-stream"))
+                        .build();
+            }
+
+        } catch (IOException e) {
+            throw new ModuleException("Failed to merge PDF files.", PdfBoxErrors.PDF_PROCESSING_ERROR, e);
+        } finally {
+            for (RandomAccessRead rar : buffers) {
+                try {
+                    rar.close();
+                } catch (IOException ioe) {
+                    LOGGER.warn("Failed to close RandomAccessRead buffer: {}", ioe.getMessage());
+                }
+            }
+        }
+    }
+
+
 
 }
