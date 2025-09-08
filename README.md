@@ -12,6 +12,7 @@ A lightweight MuleSoft connector that enables PDF manipulation using Apache PDFB
 - **Rotate Pages**: Rotate a range of pages clockwise or counterclockwise.
 - **Split Pages**: Split a PDF into individual single-page PDF files.
 - **Merge PDFs**: Merge array of PDFs into individual single PDF file.
+- **Image To PDF**: Simple Image to PDF.
 
 ## 🧰 Built With
 
@@ -77,6 +78,13 @@ A lightweight MuleSoft connector that enables PDF manipulation using Apache PDFB
 ### `mergePDFs`
 **Description**: Merge array of PDFs into individual single PDF file.  
 **Input**: PDF Array of `InputStream`s, one per PDF
+**Output**: PDF `InputStream`
+
+---
+
+### `imageToPdf`
+**Description**: Convert an Image to PDF.  
+**Input**: An Image
 **Output**: PDF `InputStream`
 
 ---
