@@ -13,10 +13,9 @@ import org.apache.pdfbox.io.RandomAccessRead;
 import org.apache.pdfbox.io.RandomAccessReadBuffer;
 import org.apache.pdfbox.multipdf.PDFMergerUtility;
 import org.apache.pdfbox.multipdf.Splitter;
-import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDDocumentInformation;
-import org.apache.pdfbox.pdmodel.PDPage;
-import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.*;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.jetbrains.annotations.NotNull;
 import org.mule.extension.pdfBox.api.PdfBoxFileAttributes;
@@ -647,6 +646,54 @@ public class PdfBoxOperations {
         }
     }
 
+    /**
+     * Converts a single image (JPG or PNG) to a single-page PDF document.
+     * <p>
+     * This operation takes an image as an InputStream, creates a new PDF document,
+     * adds a page with the same dimensions as the image, and embeds the image
+     * onto that page.
+     *
+     * @param imageStream     Binary content of the image.
+     * @param streamingHelper MuleSoft streaming helper.
+     * @return A Result containing the new PDF as an InputStream and metadata as attributes.
+     * @throws IOException If there's an error reading the image or creating the PDF.
+     */
+    @DisplayName("Apache PDFBox - Image to PDF")
+    @Summary("Converts a single image (JPG, PNG, etc.) to a one-page PDF document.")
+    @MediaType(value = MediaType.APPLICATION_OCTET_STREAM)
+    @Throws(PdfBoxErrorTypeProvider.class)
+    public Result<InputStream, PdfBoxFileAttributes> imageToPdf(
+            @NotNull @DisplayName("Image File [Binary]")
+            @Content
+            InputStream imageStream,
+            StreamingHelper streamingHelper) throws IOException {
 
+        try (PDDocument doc = new PDDocument()) {
+            PDImageXObject pdImage = PDImageXObject.createFromByteArray(doc, toByteArray(imageStream), "image.png");
+
+            // Create a new page with the same dimensions as the image
+            PDRectangle pageRect = new PDRectangle(pdImage.getWidth(), pdImage.getHeight());
+            PDPage page = new PDPage(pageRect);
+            doc.addPage(page);
+
+            try (PDPageContentStream contents = new PDPageContentStream(doc, page)) {
+                contents.drawImage(pdImage, 0, 0, pdImage.getWidth(), pdImage.getHeight());
+            }
+
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            doc.save(outputStream);
+
+            PdfBoxFileAttributes attributes = extractPdfMetadata(doc, outputStream.size());
+
+            return Result.<InputStream, PdfBoxFileAttributes>builder()
+                    .output(new ByteArrayInputStream(outputStream.toByteArray()))
+                    .mediaType(org.mule.runtime.api.metadata.MediaType.parse("application/octet-stream"))
+                    .attributes(attributes)
+                    .build();
+
+        } catch (IOException e) {
+            throw new ModuleException("Failed to convert image to PDF. Check if the input file is a valid image.", PdfBoxErrors.PDF_PROCESSING_ERROR, e);
+        }
+    }
 
 }

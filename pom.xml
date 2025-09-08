@@ -13,7 +13,7 @@
 	<groupId>io.github.mulesoft-forge</groupId>
 	<artifactId>mule-pdfbox-module</artifactId>
 	<packaging>mule-extension</packaging>
-	<version>1.0.1</version>
+	<version>1.0.2</version>
 
 	<name>MuleSoftForge PDFBox Module</name>
 	<description>A Mule extension that provides functionality to Manipulate a PDF using Apache PDFBox</description>
